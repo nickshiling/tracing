@@ -134,15 +134,15 @@ impl RollingFileAppender {
         rotation: Rotation,
         directory: impl AsRef<Path>,
         file_name_prefix: impl AsRef<Path>,
-    ) -> RollingFileAppender {
+    ) -> io::Result<RollingFileAppender> {
         let now = OffsetDateTime::now_utc();
-        let (state, writer) = Inner::new(now, rotation, directory, file_name_prefix);
-        Self {
+        let (state, writer) = Inner::new(now, rotation, directory, file_name_prefix)?;
+        Ok(Self {
             state,
             writer,
             #[cfg(test)]
             now: Box::new(OffsetDateTime::now_utc),
-        }
+        })
     }
 
     #[inline]
@@ -232,7 +232,7 @@ pub fn minutely(
     directory: impl AsRef<Path>,
     file_name_prefix: impl AsRef<Path>,
 ) -> RollingFileAppender {
-    RollingFileAppender::new(Rotation::MINUTELY, directory, file_name_prefix)
+    RollingFileAppender::new(Rotation::MINUTELY, directory, file_name_prefix).expect("failed to create appender")
 }
 
 /// Creates an hourly, rolling file appender.
@@ -267,7 +267,7 @@ pub fn hourly(
     directory: impl AsRef<Path>,
     file_name_prefix: impl AsRef<Path>,
 ) -> RollingFileAppender {
-    RollingFileAppender::new(Rotation::HOURLY, directory, file_name_prefix)
+    RollingFileAppender::new(Rotation::HOURLY, directory, file_name_prefix).expect("failed to create appender")
 }
 
 /// Creates a file appender that rotates daily.
@@ -303,7 +303,7 @@ pub fn daily(
     directory: impl AsRef<Path>,
     file_name_prefix: impl AsRef<Path>,
 ) -> RollingFileAppender {
-    RollingFileAppender::new(Rotation::DAILY, directory, file_name_prefix)
+    RollingFileAppender::new(Rotation::DAILY, directory, file_name_prefix).expect("failed to create appender")
 }
 
 /// Creates a non-rolling, file appender
@@ -334,7 +334,7 @@ pub fn daily(
 ///
 /// This will result in a log file located at `/some/path/non-rolling.log`.
 pub fn never(directory: impl AsRef<Path>, file_name: impl AsRef<Path>) -> RollingFileAppender {
-    RollingFileAppender::new(Rotation::NEVER, directory, file_name)
+    RollingFileAppender::new(Rotation::NEVER, directory, file_name).expect("failed to create appender")
 }
 
 /// Defines a fixed period for rolling of a log file.
@@ -481,14 +481,14 @@ impl Inner {
         rotation: Rotation,
         directory: impl AsRef<Path>,
         file_name_prefix: impl AsRef<Path>,
-    ) -> (Self, RwLock<File>) {
+    ) -> io::Result<(Self, RwLock<File>)> {
         let log_directory = directory.as_ref().to_str().unwrap();
         let log_filename_prefix = file_name_prefix.as_ref().to_str().unwrap();
 
         let filename = rotation.join_date(log_filename_prefix, &now);
         let next_date = rotation.next_date(&now);
         let writer = RwLock::new(
-            create_writer(log_directory, &filename).expect("failed to create appender"),
+            create_writer(log_directory, &filename)?,
         );
 
         let inner = Inner {
@@ -501,7 +501,7 @@ impl Inner {
             ),
             rotation,
         };
-        (inner, writer)
+        Ok((inner, writer))
     }
 
     fn refresh_writer(&self, now: OffsetDateTime, file: &mut File) {
@@ -599,7 +599,7 @@ mod test {
 
     fn test_appender(rotation: Rotation, file_prefix: &str) {
         let directory = tempfile::tempdir().expect("failed to create tempdir");
-        let mut appender = RollingFileAppender::new(rotation, directory.path(), file_prefix);
+        let mut appender = RollingFileAppender::new(rotation, directory.path(), file_prefix).expect("failed to create appender");
 
         let expected_value = "Hello";
         write_to_log(&mut appender, expected_value);
@@ -703,7 +703,7 @@ mod test {
         let now = OffsetDateTime::parse("2020-02-01 10:01:00 +00:00:00", &format).unwrap();
         let directory = tempfile::tempdir().expect("failed to create tempdir");
         let (state, writer) =
-            Inner::new(now, Rotation::HOURLY, directory.path(), "test_make_writer");
+            Inner::new(now, Rotation::HOURLY, directory.path(), "test_make_writer").expect("failed to create appender");
 
         let clock = Arc::new(Mutex::new(now));
         let now = {
