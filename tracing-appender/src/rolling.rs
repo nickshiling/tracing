@@ -89,16 +89,15 @@ impl RollingFileAppender {
         rotation: Rotation,
         directory: impl AsRef<Path>,
         file_name_prefix: impl AsRef<Path>,
-    ) -> RollingFileAppender {
-        RollingFileAppender {
-            inner: InnerAppender::new(
-                directory.as_ref(),
-                file_name_prefix.as_ref(),
-                rotation,
-                Utc::now(),
-            )
-            .expect("Failed to create appender"),
-        }
+    ) -> io::Result<Self> {
+        let inner = InnerAppender::new(
+            directory.as_ref(),
+            file_name_prefix.as_ref(),
+            rotation,
+            Utc::now(),
+        )?;
+
+        Ok(RollingFileAppender { inner })
     }
 }
 
@@ -145,6 +144,7 @@ pub fn minutely(
     file_name_prefix: impl AsRef<Path>,
 ) -> RollingFileAppender {
     RollingFileAppender::new(Rotation::MINUTELY, directory, file_name_prefix)
+        .expect("Failed to create appender")
 }
 
 /// Creates an hourly, rolling file appender.
@@ -180,6 +180,7 @@ pub fn hourly(
     file_name_prefix: impl AsRef<Path>,
 ) -> RollingFileAppender {
     RollingFileAppender::new(Rotation::HOURLY, directory, file_name_prefix)
+        .expect("Failed to create appender")
 }
 
 /// Creates a file appender that rotates daily.
@@ -216,6 +217,7 @@ pub fn daily(
     file_name_prefix: impl AsRef<Path>,
 ) -> RollingFileAppender {
     RollingFileAppender::new(Rotation::DAILY, directory, file_name_prefix)
+        .expect("Failed to create appender")
 }
 
 /// Creates a non-rolling, file appender
@@ -247,6 +249,7 @@ pub fn daily(
 /// This will result in a log file located at `/some/path/non-rolling.log`.
 pub fn never(directory: impl AsRef<Path>, file_name: impl AsRef<Path>) -> RollingFileAppender {
     RollingFileAppender::new(Rotation::NEVER, directory, file_name)
+        .expect("Failed to create appender")
 }
 
 /// Defines a fixed period for rolling of a log file.
@@ -376,7 +379,8 @@ mod test {
     }
 
     fn test_appender(rotation: Rotation, directory: TempDir, file_prefix: &str) {
-        let mut appender = RollingFileAppender::new(rotation, directory.path(), file_prefix);
+        let mut appender = RollingFileAppender::new(rotation, directory.path(), file_prefix)
+            .expect("Failed to create appender");
 
         let expected_value = "Hello";
         write_to_log(&mut appender, expected_value);
