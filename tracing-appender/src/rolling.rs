@@ -27,7 +27,7 @@
 //! ```rust
 //! # fn docs() {
 //! use tracing_appender::rolling::{RollingFileAppender, Rotation};
-//! let file_appender = RollingFileAppender::new(Rotation::HOURLY, "/some/directory", "prefix.log");
+//! let file_appender = RollingFileAppender::new(Rotation::HOURLY, "/some/directory", "prefix.log").unwrap();
 //! # }
 //! ```
 use crate::sync::{RwLock, RwLockReadGuard};
@@ -134,24 +134,22 @@ impl RollingFileAppender {
     /// ```rust
     /// # fn docs() {
     /// use tracing_appender::rolling::{RollingFileAppender, Rotation};
-    /// let file_appender = RollingFileAppender::new(Rotation::HOURLY, "/some/directory", "prefix.log");
+    /// let file_appender = RollingFileAppender::new(Rotation::HOURLY, "/some/directory", "prefix.log").unwrap();
     /// # }
     /// ```
     pub fn new(
         rotation: Rotation,
         directory: impl AsRef<Path>,
         file_name_prefix: impl AsRef<Path>,
-    ) -> RollingFileAppender {
+    ) -> io::Result<RollingFileAppender> {
         let now = OffsetDateTime::now_utc();
         let log_directory = directory.as_ref().to_str().unwrap();
         let log_filename_prefix = file_name_prefix.as_ref().to_str().unwrap();
 
         let filename = rotation.join_date(log_filename_prefix, &now);
         let next_date = rotation.next_date(&now);
-        let writer = RwLock::new(
-            create_writer(log_directory, &filename).expect("failed to create appender"),
-        );
-        Self {
+        let writer = RwLock::new(create_writer(log_directory, &filename)?);
+        Ok(Self {
             state: Inner {
                 log_directory: log_directory.to_string(),
                 log_filename_prefix: log_filename_prefix.to_string(),
@@ -163,7 +161,7 @@ impl RollingFileAppender {
                 rotation,
             },
             writer,
-        }
+        })
     }
 }
 
@@ -234,6 +232,7 @@ pub fn minutely(
     file_name_prefix: impl AsRef<Path>,
 ) -> RollingFileAppender {
     RollingFileAppender::new(Rotation::MINUTELY, directory, file_name_prefix)
+        .expect("failed to create appender")
 }
 
 /// Creates an hourly, rolling file appender.
@@ -269,6 +268,7 @@ pub fn hourly(
     file_name_prefix: impl AsRef<Path>,
 ) -> RollingFileAppender {
     RollingFileAppender::new(Rotation::HOURLY, directory, file_name_prefix)
+        .expect("failed to create appender")
 }
 
 /// Creates a file appender that rotates daily.
@@ -305,6 +305,7 @@ pub fn daily(
     file_name_prefix: impl AsRef<Path>,
 ) -> RollingFileAppender {
     RollingFileAppender::new(Rotation::DAILY, directory, file_name_prefix)
+        .expect("failed to create appender")
 }
 
 /// Creates a non-rolling, file appender
@@ -336,6 +337,7 @@ pub fn daily(
 /// This will result in a log file located at `/some/path/non-rolling.log`.
 pub fn never(directory: impl AsRef<Path>, file_name: impl AsRef<Path>) -> RollingFileAppender {
     RollingFileAppender::new(Rotation::NEVER, directory, file_name)
+        .expect("failed to create appender")
 }
 
 /// Defines a fixed period for rolling of a log file.
@@ -565,7 +567,8 @@ mod test {
 
     fn test_appender(rotation: Rotation, file_prefix: &str) {
         let directory = tempfile::tempdir().expect("failed to create tempdir");
-        let mut appender = RollingFileAppender::new(rotation, directory.path(), file_prefix);
+        let mut appender = RollingFileAppender::new(rotation, directory.path(), file_prefix)
+            .expect("failed to create appender");
 
         let expected_value = "Hello";
         write_to_log(&mut appender, expected_value);
