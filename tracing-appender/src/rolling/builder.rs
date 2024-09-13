@@ -19,7 +19,7 @@ pub struct Builder {
 pub struct InitError {
     context: &'static str,
     #[source]
-    source: io::Error,
+    pub(crate) source: io::Error,
 }
 
 impl InitError {

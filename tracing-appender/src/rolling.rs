@@ -142,7 +142,7 @@ impl RollingFileAppender {
         rotation: Rotation,
         directory: impl AsRef<Path>,
         filename_prefix: impl AsRef<Path>,
-    ) -> RollingFileAppender {
+    ) -> io::Result<RollingFileAppender> {
         let filename_prefix = filename_prefix
             .as_ref()
             .to_str()
@@ -151,7 +151,7 @@ impl RollingFileAppender {
             .rotation(rotation)
             .filename_prefix(filename_prefix)
             .build(directory)
-            .expect("initializing rolling file appender failed")
+            .map_err(|e| e.source)
     }
 
     /// Returns a new [`Builder`] for configuring a `RollingFileAppender`.
@@ -297,6 +297,7 @@ pub fn minutely(
     file_name_prefix: impl AsRef<Path>,
 ) -> RollingFileAppender {
     RollingFileAppender::new(Rotation::MINUTELY, directory, file_name_prefix)
+        .expect("initializing rolling file appender failed")
 }
 
 /// Creates an hourly-rotating file appender.
@@ -332,6 +333,7 @@ pub fn hourly(
     file_name_prefix: impl AsRef<Path>,
 ) -> RollingFileAppender {
     RollingFileAppender::new(Rotation::HOURLY, directory, file_name_prefix)
+        .expect("initializing rolling file appender failed")
 }
 
 /// Creates a daily-rotating file appender.
@@ -368,6 +370,7 @@ pub fn daily(
     file_name_prefix: impl AsRef<Path>,
 ) -> RollingFileAppender {
     RollingFileAppender::new(Rotation::DAILY, directory, file_name_prefix)
+        .expect("initializing rolling file appender failed")
 }
 
 /// Creates a non-rolling file appender.
@@ -399,6 +402,7 @@ pub fn daily(
 /// This will result in a log file located at `/some/path/non-rolling.log`.
 pub fn never(directory: impl AsRef<Path>, file_name: impl AsRef<Path>) -> RollingFileAppender {
     RollingFileAppender::new(Rotation::NEVER, directory, file_name)
+        .expect("initializing rolling file appender failed")
 }
 
 /// Defines a fixed period for rolling of a log file.
